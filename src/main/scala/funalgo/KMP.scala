@@ -1,10 +1,22 @@
 package funalgo
 
 import java.util.stream.IntStream
+import scala.collection.mutable.ArrayBuffer
 
 object KMP {
 
-  private def buildPrefixs(pattern: String): Vector[Int] = ???
+  def buildPrefixs(pattern: String): Vector[Int] =
+    pattern
+      .drop(1)
+      .foldLeft(ArrayBuffer(0))((buffer, char) =>
+        LazyList
+          .iterate(buffer.last)(buffer.apply)
+          .find(pidx => pidx == 0 || pattern(pidx) == char) match
+          case None => throw Error("Will not ever happend")
+          case Some(pidx) =>
+            buffer :+ (if pattern(pidx) == char then pidx + 1 else pidx)
+      )
+      .toVector
 
   private def auxFind(
       prefixTable: Vector[Int],

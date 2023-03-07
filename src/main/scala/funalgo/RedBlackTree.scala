@@ -1,5 +1,6 @@
 package funalgo
 import math.Ordering.Implicits.infixOrderingOps
+import scala.collection.immutable.Queue
 
 enum Color:
   case Red, Black
@@ -27,7 +28,7 @@ class RedBlackTree[K, V](root: RedBlackNode[K, V])(using Ordering[K])
       case None       => parent
       case Some(node) => node.copy(left = Some(parent.copy(right = node.left)))
 
-  def insert(key: K, value: V): BinaryTree[K, V] = new RedBlackTree(
+  def insert(key: K, value: V): RedBlackTree[K, V] = new RedBlackTree(
     auxInsert(key, value, root.copy(color = Color.Black))
   )
 
@@ -43,20 +44,20 @@ class RedBlackTree[K, V](root: RedBlackNode[K, V])(using Ordering[K])
           .map(auxInsert(key, value, _))
           .orElse(Some(RedBlackNode(key, value)))
         val gn = currentNode.copy(left = nl)
-        fixrb(gn, nl.get, gn.right.get).getOrElse(gn)
+        fixrb(gn, nl.get, gn.right).getOrElse(gn)
       else
         val nr = currentNode.right
           .map(auxInsert(key, value, _))
           .orElse(Some(RedBlackNode(key, value)))
         val gn = currentNode.copy(right = nr)
-        fixrb(gn, nr.get, gn.left.get).getOrElse(gn)
+        fixrb(gn, nr.get, gn.left).getOrElse(gn)
 
   private def fixrb(
       gn: RedBlackNode[K, V],
       pn: RedBlackNode[K, V],
-      un: RedBlackNode[K, V]
+      un: Option[RedBlackNode[K, V]]
   ): Option[RedBlackNode[K, V]] =
-    (pn.color match
+    ((pn.color match
       case Color.Red =>
         (pn.right :: pn.left :: Nil)
           .find(_.map(_.color == Color.Red).getOrElse(false))
@@ -65,22 +66,30 @@ class RedBlackTree[K, V](root: RedBlackNode[K, V])(using Ordering[K])
     ) match
       case None => None
       case node: Some[RedBlackNode[K, V]] =>
-        Some(
-          un.color match
-            case Color.Red =>
+        (
+          node,
+          un match
+            case None => Color.Black
+            case Some(unv) =>
+              unv.color
+        ) match
+          case (_, Color.Red) =>
+            Some(
               if pn == gn.left then
                 gn.copy(
                   left = Some(pn.copy(color = Color.Black)),
-                  right = Some(un.copy(color = Color.Black)),
+                  right = un.map(_.copy(color = Color.Black)),
                   color = Color.Red
                 )
               else
                 gn.copy(
                   right = Some(pn.copy(color = Color.Black)),
-                  left = Some(un.copy(color = Color.Black)),
+                  left = un.map(_.copy(color = Color.Black)),
                   color = Color.Red
                 )
-            case Color.Black =>
+            )
+          case (node, Color.Black) =>
+            Some(
               if pn == gn.left then
                 rRotate(
                   gn.copy(
@@ -97,9 +106,35 @@ class RedBlackTree[K, V](root: RedBlackNode[K, V])(using Ordering[K])
                       .map(_.copy(color = Color.Black))
                   )
                 )
-        )
+            )
+    )
+
+  def foreachBFS(f: (K, V) => Unit): Unit =
+    val sq = Stream.iterate(Queue(root)) { q =>
+      val (node, tail) = q.dequeue
+      tail ++ List(node.left, node.right).flatten
+    }
+    sq.takeWhile(q => q.nonEmpty).foreach(q => f(q.head.key, q.head.value))
+
 }
 
 object RedBlackTree:
   def apply[K, V](key: K, value: V)(using Ordering[K]) =
     new RedBlackTree[K, V](RedBlackNode[K, V](key, value))
+
+object App {
+  def main(args: Array[String]): Unit = {
+    val x = RedBlackTree(1, "A")
+      .insert(2, "B")
+      .insert(3, "C")
+      .insert(4, "D")
+      .insert(5, "E")
+      .insert(6, "F")
+      .insert(7, "G")
+      .insert(8, "H")
+      .insert(9, "I")
+      .insert(10, "J")
+
+    x.foreachBFS((k, v) => println(s"$k -> $v"))
+  }
+}
